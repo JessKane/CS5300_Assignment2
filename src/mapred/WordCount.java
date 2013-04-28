@@ -28,13 +28,15 @@ import org.apache.hadoop.mapred.TextOutputFormat;
  	     private Text word = new Text();
  	
  	     public void map(LongWritable key, Text value, OutputCollector<Text, IntWritable> output, Reporter reporter) throws IOException {
- 	       String line = value.toString();
+ 	    	 System.out.println("--start map--");
+ 	    	 String line = value.toString();
  	       line += " Rhino";
  	       StringTokenizer tokenizer = new StringTokenizer(line);
  	       while (tokenizer.hasMoreTokens()) {
  	         word.set(tokenizer.nextToken());
  	         output.collect(word, one);
  	       }
+ 	      System.out.println("--end map--");
  	     }
  	   }
  	
@@ -45,6 +47,7 @@ import org.apache.hadoop.mapred.TextOutputFormat;
  	         sum += values.next().get();
  	       }
  	       output.collect(key, new IntWritable(sum));
+ 	       System.out.println("key: " + key + ", sum: " + sum);
  	     }
  	   }
  	
