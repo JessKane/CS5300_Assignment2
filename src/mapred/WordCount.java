@@ -52,7 +52,7 @@ import org.apache.hadoop.mapred.TextOutputFormat;
  	   }
  	
  	   public static void main(String[] args) throws Exception {
- 	     JobConf conf = new JobConf(WordCount.class);
+ 	     /*JobConf conf = new JobConf(WordCount.class);
  	     conf.setJobName("wordcount");
  	
  	     conf.setOutputKeyClass(Text.class);
@@ -68,6 +68,6 @@ import org.apache.hadoop.mapred.TextOutputFormat;
  	     FileInputFormat.setInputPaths(conf, new Path(args[0]));
  	     FileOutputFormat.setOutputPath(conf, new Path(args[1]));
  	
- 	     JobClient.runJob(conf);
+ 	     JobClient.runJob(conf);*/
  	   }
  	}

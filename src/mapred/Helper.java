@@ -4,17 +4,20 @@
 
 package mapred;
 import java.io.*;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Helper {
-	static File nodesTxt = new File("input_files/nodes.txt");
-	static File edgesTxt = new File("input_files/edges.txt");
-	static File blocksTxt = new File("input_files/blocks.txt");
+	static Properties pathProperties = new Properties();
+	static File nodesTxt = new File("/home/eric/hadoop/input_files/nodes.txt");
+	static File edgesTxt = new File("/home/eric/hadoop/input_files/edges.txt");
+	static File blocksTxt = new File("/home/eric/hadoop/input_files/blocks.txt");
+
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
-	static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
 	static ArrayList<String> blocks = parseBlocks(blocksTxt);
 	
 	
@@ -22,6 +25,9 @@ public class Helper {
 		System.out.println("parsing nodes");
 		Scanner scanner = null;
 	    ConcurrentHashMap<String,String> nodes= new ConcurrentHashMap<String, String>();
+		//scanner = new Scanner(nodesTxt);
+	    
+	    pathProperties.getClass();
 		try {
 			scanner = new Scanner(nodesTxt);
 		} catch (FileNotFoundException e) {
@@ -41,6 +47,8 @@ public class Helper {
 	        	nodes.put(result[0], result[1]);
 	        }
 	    }
+	    
+	    scanner.close();
 		return nodes;
 	}
 	
@@ -61,6 +69,8 @@ public class Helper {
 	        String line = (scanner.nextLine());
 	        blocks.add(line.trim());
 	    }
+	    
+	    scanner.close();
 		return blocks;
 	}
 	
@@ -107,7 +117,7 @@ public class Helper {
 	
 
 	private static ConcurrentHashMap<String, ArrayList<String>> getInNeighbors(){
-		ConcurrentHashMap<String, ArrayList<String>> outNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
+		ConcurrentHashMap<String, ArrayList<String>> inNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
 		Scanner scanner = null;
 		try {
 			scanner = new Scanner(edgesTxt);
@@ -134,17 +144,17 @@ public class Helper {
 		        }
        
 		        if (!(prob>= rejectMin && prob< rejectLimit)){
-		        	if (outNeighbors.containsKey(dest)){
-		        		outNeighbors.get(dest).add(src);
+		        	if (inNeighbors.containsKey(dest)){
+		        		inNeighbors.get(dest).add(src);
 		        	}
 		        	else{
-		        		ArrayList<String> outNeighborList = new ArrayList<String>();
-		        		outNeighborList.add(src);
-		        		outNeighbors.put(dest, outNeighborList);
+		        		ArrayList<String> inNeighborList = new ArrayList<String>();
+		        		inNeighborList.add(src);
+		        		inNeighbors.put(dest, inNeighborList);
 		        	}
 		        }
 		 }
-		return outNeighbors;
+		return inNeighbors;
 	}
 	
 	/**
@@ -199,6 +209,16 @@ public class Helper {
 		
 	}
 	
+	public static String getBlockId(String nodeId){
+		int nodeIdInt = Integer.parseInt(nodeId);
+		for(int indexOfFirst = 0; indexOfFirst < blocks.size(); indexOfFirst++){
+			if(nodeIdInt < Integer.parseInt(blocks.get(indexOfFirst))){
+				return (indexOfFirst - 1) + "";
+			}
+		}
+		return -1 + "";
+	}
+	
 	/**
 	 * 
 	 * @param node
@@ -226,7 +246,7 @@ public class Helper {
 		return getInDegree(node) + getOutDegree(node);
 	}
 	
-	private static int writePRInputFile(){
+	/*private static int writePRInputFile(){
 		Double initial_PR = 1.0;
 		PrintWriter out = null;
 		int numNodes = 0;
@@ -259,8 +279,43 @@ public class Helper {
 		System.out.println("done writing file");
 		return numNodes;
 	}
+	
+	private static int writeBlockedPRInputFile(){
+		Double initial_PR = 1.0;
+		PrintWriter out = null;
+		int numNodes = 0;
+		try {
+			out = new PrintWriter(new FileOutputStream("input_files/output.txt"));
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("getting inNeighbors");
+		ConcurrentHashMap<String,ArrayList<String>> inNeighborsHT = getInNeighbors();
+		System.out.println("inNeighbors done");
+		for(String node: nodes.keySet()){
+			numNodes++;
+			out.write(node+"\t"+initial_PR+",");
+			ArrayList<String> inNeighbors = inNeighborsHT.get(node);
+			if (!(inNeighbors == null)){
+//				System.out.println(node + "'s neighbors: " + outNeighbors);
+				for(int i = 0; i < inNeighbors.size(); i++){
+					out.write(inNeighbors.get(i));
+					if (i!=inNeighbors.size()-1){
+						out.write(",");
+					}
+				}
+			}
+			out.write("\n");
+			System.out.println("node " + node + " done writing");
+		}
+		out.close();
+		System.out.println("done writing file");
+		return numNodes;
+	}*/
+	
+	
 	public static void main(String[] args) throws Exception {
-		int newNumNodes = writePRInputFile();
-		System.out.println("done " + newNumNodes);
+		//writePRInputFile();
 	}
 }
