@@ -8,9 +8,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Helper {
-	static File nodesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/nodes.txt");
-	static File edgesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/edges.txt");
-	static File blocksTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/blocks.txt");
+	static File nodesTxt = new File("input_files/nodes.txt");
+	static File edgesTxt = new File("input_files/edges.txt");
+	static File blocksTxt = new File("input_files/blocks.txt");
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
@@ -256,7 +256,13 @@ public class Helper {
 		 System.out.println("done writing file");
 	}
 	
-	public static void main(String[] args) throws Exception {
+	public static void print(Object nodes2){
+		System.out.println(nodes2.toString());
+	}
 	
+	public static void main(String[] args) throws Exception {
+		
+		print("hello");
+		print(getEdgesInBlock("27").size());
 	}
 }

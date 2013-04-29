@@ -34,6 +34,7 @@ public class SimplePageRank {
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
 			String[] mapInput = line.split(",");
+			System.out.println("new MAPPER");
 			
 			// Collect Input
 			Integer nodeU = Integer.parseInt(mapInput[0]);
@@ -58,6 +59,7 @@ public class SimplePageRank {
 			for (Integer edge: outgoingEdges) {
 				Text outputKey = new Text ("" + edge);
 				Text outputValue = new Text ("pr," + nodeU + "," + pageRankU/outgoingEdges.size());
+				System.out.println("to red " + outputKey + " " + outputValue);
 				output.collect(outputKey, outputValue);
 			}
 		}
@@ -76,25 +78,33 @@ public class SimplePageRank {
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
 			double pageRankSum = 0.0;
+			System.out.println("new REDUCER");
 			while (values.hasNext()) {
 				String line = values.next().toString();
+				System.out.println(key + " " + line);
 				
 				// The two types of input are distinguished by prefix.
 				if (line.startsWith("links")) {
 					String[] splitLine = line.split(",");
 					for (int i = 1; i < splitLine.length; i++) { // we don't care about the prefix
+						System.out.println("LINK " + Integer.parseInt(splitLine[i]));
 						outlinks.add(Integer.parseInt(splitLine[i]));
 					}
 				} else if (line.startsWith("pr")) {
 					String[] splitLine = line.split(",");
+					
+					
 					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
 					pageRankSum += Double.parseDouble(splitLine[2]);
+					System.out.println("PR pageRankSum " + pageRankSum );
 				}
 			}
 			
 			// Compute New PageRank Value
 			
+			System.out.println("Getting new pagerank with " + d + " " + outlinks.size() + " " + pageRankSum);
 			Double newPageRank = ((1-d)/outlinks.size()) * pageRankSum*d;
+			System.out.println("New PageRank " + newPageRank + "\n");
 			
 			// Emit the current data
 			StringBuilder sb = new StringBuilder();
@@ -120,7 +130,7 @@ public class SimplePageRank {
 		conf.setOutputValueClass(Text.class);
 
 		conf.setMapperClass(Map.class);
-		conf.setCombinerClass(Reduce.class);
+		//conf.setCombinerClass(Reduce.class);
 		conf.setReducerClass(Reduce.class);
 
 		conf.setInputFormat(TextInputFormat.class);
@@ -128,7 +138,10 @@ public class SimplePageRank {
 
 		FileInputFormat.setInputPaths(conf, new Path(args[0]));
 		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
-
+		
+		conf.setNumMapTasks(1);
+		conf.setNumReduceTasks(1);
+		
 		JobClient.runJob(conf);
 	}
 }
