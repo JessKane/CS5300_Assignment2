@@ -226,43 +226,41 @@ public class Helper {
 		return getInDegree(node) + getOutDegree(node);
 	}
 	
-	private static void writePRInputFile(){
+	private static int writePRInputFile(){
+		Double initial_PR = 1.0;
 		PrintWriter out = null;
+		int numNodes = 0;
 		try {
-			out = new PrintWriter(new FileOutputStream("/media/OS_/CS5300/cs5300_proj2/input_files/output.txt"));
+			out = new PrintWriter(new FileOutputStream("input_files/output.txt"));
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		 System.out.println("getting outneighbors");
+		System.out.println("getting outneighbors");
 		ConcurrentHashMap<String,ArrayList<String>> outNeighborsHT = getOutNeighbors();
 		System.out.println("outneighbors done");
-	 	for(String node: nodes.keySet()){
-	 		 out.write(node+","+Double.MAX_VALUE+",");
-	 		 ArrayList<String> outNeighbors = outNeighborsHT.get(node);
-	 		 if (!(outNeighbors == null)){
-//		 		 System.out.println(node + "'s neighbors: " + outNeighbors);
-		 		 for(int i = 0; i < outNeighbors.size(); i++){
-		 			out.write(outNeighbors.get(i));
-		 			if (i!=outNeighbors.size()-1){
-		 				out.write(",");
-		 			}
-		 		 }
-	 		 }
-	 		 out.write("\n");
-	 		 System.out.println("node " + node + " done writing");
-		 }
-		 out.close();
-		 System.out.println("done writing file");
+		for(String node: nodes.keySet()){
+			numNodes++;
+			out.write(node+"\t"+initial_PR+",");
+			ArrayList<String> outNeighbors = outNeighborsHT.get(node);
+			if (!(outNeighbors == null)){
+//				System.out.println(node + "'s neighbors: " + outNeighbors);
+				for(int i = 0; i < outNeighbors.size(); i++){
+					out.write(outNeighbors.get(i));
+					if (i!=outNeighbors.size()-1){
+						out.write(",");
+					}
+				}
+			}
+			out.write("\n");
+			System.out.println("node " + node + " done writing");
+		}
+		out.close();
+		System.out.println("done writing file");
+		return numNodes;
 	}
-	
-	public static void print(Object nodes2){
-		System.out.println(nodes2.toString());
-	}
-	
 	public static void main(String[] args) throws Exception {
-		
-		print("hello");
-		print(getEdgesInBlock("27").size());
+		int newNumNodes = writePRInputFile();
+		System.out.println("done " + newNumNodes);
 	}
 }
