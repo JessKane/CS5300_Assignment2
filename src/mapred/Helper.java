@@ -257,6 +257,8 @@ public class Helper {
 	}
 	
 	public static void main(String[] args) throws Exception {
-	
+		double PR = Double.parseDouble("1.797697E304")/105.0;
+		System.out.println("maxS: 1.7976931348623157E308" + ", PR = " + PR);
+		
 	}
 }
