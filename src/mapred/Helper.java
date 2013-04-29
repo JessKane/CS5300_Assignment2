@@ -227,6 +227,7 @@ public class Helper {
 	}
 	
 	private static void writePRInputFile(){
+		Double initial_PR = 1.0;
 		PrintWriter out = null;
 		try {
 			out = new PrintWriter(new FileOutputStream("/media/OS_/CS5300/cs5300_proj2/input_files/output.txt"));
@@ -238,7 +239,7 @@ public class Helper {
 		ConcurrentHashMap<String,ArrayList<String>> outNeighborsHT = getOutNeighbors();
 		System.out.println("outneighbors done");
 	 	for(String node: nodes.keySet()){
-	 		 out.write(node+","+Double.MAX_VALUE+",");
+	 		 out.write(node+","+initial_PR+",");
 	 		 ArrayList<String> outNeighbors = outNeighborsHT.get(node);
 	 		 if (!(outNeighbors == null)){
 //		 		 System.out.println(node + "'s neighbors: " + outNeighbors);
@@ -257,8 +258,7 @@ public class Helper {
 	}
 	
 	public static void main(String[] args) throws Exception {
-		double PR = Double.parseDouble("1.797697E304")/105.0;
-		System.out.println("maxS: 1.7976931348623157E308" + ", PR = " + PR);
+		writePRInputFile();
 		
 	}
 }

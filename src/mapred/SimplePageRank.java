@@ -36,7 +36,7 @@ public class SimplePageRank {
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			totalNodes ++;
 			String line = value.toString();
-			System.out.println("mapper input: " + line);
+//			System.out.println("mapper input: " + line);
 			String[] mapInput = line.split(",");
 			
 			// Collect Input
@@ -55,7 +55,7 @@ public class SimplePageRank {
 			}
 			sb.deleteCharAt(sb.length() -1); // remove trailing comma
 			
-			System.out.println("mapper output: nodeU= " + nodeU + ", sb=" + sb.toString());
+//			System.out.println("mapper output: nodeU= " + nodeU + ", sb=" + sb.toString());
 			output.collect(new Text(nodeU.toString()), new Text(sb.toString()));
 			
 			
@@ -71,7 +71,7 @@ public class SimplePageRank {
 				}
 				Text outputValue = new Text ("pr," + nodeU + "," + newPR);
 				output.collect(outputKey, outputValue);
-				System.out.println("mapper output: nodeV: " + edge + ", outputVal: " + outputValue.toString());
+//				System.out.println("mapper output: nodeV: " + edge + ", outputVal: " + outputValue.toString());
 			}
 		}
 	}
@@ -86,13 +86,13 @@ public class SimplePageRank {
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			// Get the input
-			System.out.println("vvvvvv");
+//			System.out.println("vvvvvv");
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
 			double pageRankSum = 0.0;
 			while (values.hasNext()) {
 				String line = values.next().toString();
-				System.out.println("reducer input line: " + line);
+//				System.out.println("reducer input line: " + line);
 				
 				// The two types of input are distinguished by prefix.
 				if (line.startsWith("links")) {
@@ -100,18 +100,23 @@ public class SimplePageRank {
 					for (int i = 1; i < splitLine.length; i++) { // we don't care about the prefix
 						outlinks.add(Integer.parseInt(splitLine[i]));
 					}
-					System.out.println("outlinks: " + outlinks);
+//					System.out.println("outlinks: " + outlinks);
 				} else if (line.startsWith("pr")) {
 					String[] splitLine = line.split(",");
 					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
 					pageRankSum += Double.parseDouble(splitLine[2]);
-					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+//					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
 				}
 			}
 			
 			// Compute New PageRank Value
-				
-			Double newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
+			Double newPageRank = 0.0;
+			if (totalNodes== 0){
+				newPageRank = 0.0;
+			}
+			else{
+				newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
+			}
 			
 			// Emit the current data
 //			StringBuilder sb = new StringBuilder();
@@ -130,9 +135,9 @@ public class SimplePageRank {
 			}
 			sb = sb.substring(0, sb.length()-1);
 //			sb.deleteCharAt(sb.length() -1); // remove trailing comma
-			System.out.println("reducer output: (" + key + ","+ sb+")");
+//			System.out.println("reducer output: (" + key + ","+ sb+")");
 			output.collect(key, new Text(sb));
-			System.out.println("^^^^^^");
+//			System.out.println("^^^^^^");
 		}
 	}
 
@@ -144,11 +149,13 @@ public class SimplePageRank {
 		conf.setOutputValueClass(Text.class);
 
 		conf.setMapperClass(Map.class);
-		conf.setCombinerClass(Reduce.class);
+//		conf.setCombinerClass(Reduce.class);
 		conf.setReducerClass(Reduce.class);
 
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
+		
+		conf.setNumReduceTasks(1);
 
 		FileInputFormat.setInputPaths(conf, new Path(args[0]));
 		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
