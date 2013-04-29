@@ -34,7 +34,7 @@ public class SimplePageRank {
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
 			String[] mapInput = line.split(",");
-			
+						
 			// Collect Input
 			Integer nodeU = Integer.parseInt(mapInput[0]);
 			Double pageRankU = Double.parseDouble(mapInput[1]);
@@ -94,7 +94,7 @@ public class SimplePageRank {
 			
 			// Compute New PageRank Value
 			
-			Double newPageRank = ((1-d)/outlinks.size()) * pageRankSum*d;
+			Double newPageRank = ((1-d)/outlinks.size()) + pageRankSum*d;
 			
 			// Emit the current data
 			StringBuilder sb = new StringBuilder();
