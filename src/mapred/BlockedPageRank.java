@@ -93,7 +93,7 @@ public class BlockedPageRank {
 		// d is dampening
 		// emit: current node v, pr(v), {w|v->w}
 		
-		int numIterations = 1;
+		int numIterations = 2;
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			// Get the input
@@ -153,10 +153,27 @@ public class BlockedPageRank {
 				for(Integer v : blockEdges.keySet()){
 					newPageRanks.put(v, 0.0);
 				}
+				for(Integer u : blockEdges.keySet()){
+					for(Integer v : blockEdges.get(u)){
+						//Check v is in block
+						if(blockEdges.keySet().contains(v)){
+							newPageRanks.put(v, pageRankValues.get(u)/blockEdges.get(u).size());
+						}
+					}
+				}
+				for(Integer u : boundaryConditions.keySet()){
+					for(Integer v : boundaryConditions.get(u)){
+						newPageRanks.put(v, newPageRanks.get(v) + pageRankValues.get(u));
+					}
+				}
 				for(Integer v : blockEdges.keySet()){
+					pageRankValues.put(v, ((1-d)/totalNodes) + newPageRanks.get(v)*d);
+				}
+				
+				/*for(Integer v : blockEdges.keySet()){
 					for(Integer u : blockEdges.keySet()){
-						//Ensure entirety of edge is within block
-						if(blockEdges.containsKey(blockEdges.get(u))){
+						//Check that <u,v> exists
+						if(blockEdges.get(u).contains(v)){
 							newPageRanks.put(v, pageRankValues.get(u)/blockEdges.get(u).size());
 						}
 					}
@@ -166,10 +183,10 @@ public class BlockedPageRank {
 						}
 					}
 					newPageRanks.put(v, ((1-d)/totalNodes) + newPageRanks.get(v)*d);
-				}
-				for(Integer v : blockEdges.keySet()){
+				}*/
+				/*for(Integer v : blockEdges.keySet()){
 					pageRankValues.put(v, newPageRanks.get(v));
-				}
+				}*/
 			}
 			
 			// Emit the current data
@@ -203,14 +220,9 @@ public class BlockedPageRank {
 
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
-		
-		conf.setNumReduceTasks(1);
 
 		FileInputFormat.setInputPaths(conf, new Path(args[0]));
 		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
-		
-		conf.setNumMapTasks(1);
-		conf.setNumReduceTasks(1);
 		
 		JobClient.runJob(conf);
 	}
