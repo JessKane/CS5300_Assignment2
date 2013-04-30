@@ -23,6 +23,7 @@ import org.apache.hadoop.mapred.TextOutputFormat;
 public class ConvergencePass {
 
 	static int totalNodes = 685230;
+	static double convergenceSum = 0.0;
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -134,8 +135,11 @@ public class ConvergencePass {
 			Double convergenceValue =
 					Math.abs(oldPR - newPageRank)/newPageRank;
 			System.out.println("Convergence for node "+key+ "= " + convergenceValue);
-			System.out.println("oldPR: " + oldPR + ", NewPR: " + newPageRank);
-			System.out.println("----");
+//			System.out.println("oldPR: " + oldPR + ", NewPR: " + newPageRank);
+//			System.out.println("----");	
+			
+			convergenceSum += convergenceValue;
+			
 			// Emit the current data
 			String sb = "";
 			sb = newPageRank + ",";
@@ -172,5 +176,7 @@ public class ConvergencePass {
 		conf.setNumReduceTasks(1);
 		
 		JobClient.runJob(conf);
+		
+		System.out.println("convergence: " + convergenceSum/totalNodes);
 	}
 }
