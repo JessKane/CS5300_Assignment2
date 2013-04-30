@@ -58,7 +58,7 @@ public class BlockedPageRank {
 				//Output #1 Edges within (or directed out of of) the block
 				//Contains full PR value of node
 			}
-			output.collect(new Text(blockId), new Text("BE,"+line));
+			output.collect(new Text(blockId), new Text("BE,"+line.replace("\t", ",")));
 			
 			
 			// Output #2: send partial pagerank along edges entering different blocks
@@ -93,52 +93,99 @@ public class BlockedPageRank {
 		// d is dampening
 		// emit: current node v, pr(v), {w|v->w}
 		
-		int numIterations = 3;
+		int numIterations = 1;
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			// Get the input
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
+			HashMap<Integer, ArrayList<Integer>> boundaryConditions = new  HashMap<Integer, ArrayList<Integer>>();
+			HashMap<Integer,ArrayList<Integer>> blockEdges = new  HashMap<Integer, ArrayList<Integer>>();
+
 			double pageRankSum = 0.0;
 			while (values.hasNext()) {
 				String line = values.next().toString();
 				System.out.println("reducer line: " + key + " " + line);
-
+				
+				String[] splitLine = line.split(",");
+				Integer emitNode = Integer.parseInt(splitLine[1]);
+				Double pageRank = Double.parseDouble(splitLine[2]);
+				ArrayList<Integer> recvNodes = new ArrayList<Integer>();
+				for (int i = 3; i < splitLine.length; i++) { 
+					recvNodes.add(Integer.parseInt(splitLine[i]));
+				}
+				
+				pageRankValues.put(emitNode, pageRank);
+				
 				// The two types of input are distinguished by prefix.
-				if (line.startsWith("BE,")) {
-					String[] splitLine = line.split(",");
-					for (int i = 1; i < splitLine.length; i++) { // we don't care about the prefix
-						outlinks.add(Integer.parseInt(splitLine[i]));
+				if (line.startsWith("BE,")) {	
+					if(blockEdges.containsKey(emitNode)){
+						blockEdges.get(emitNode).addAll(recvNodes);
 					}
-//					System.out.println("outlinks: " + outlinks);
+					else{
+						blockEdges.put(emitNode, recvNodes);
+					}
 				} else if (line.startsWith("BC,")) {
-					String[] splitLine = line.split(",");
-					
-					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
-					pageRankSum += Double.parseDouble(splitLine[2]);
-
-//					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+					if(boundaryConditions.containsKey(emitNode)){
+						boundaryConditions.get(emitNode).addAll(recvNodes);
+					}
+					else{
+						boundaryConditions.put(emitNode, recvNodes);
+					}
 				}
 			}
 			
-			// Compute New PageRank Value
-			Double newPageRank = 0.0;
-			if (totalNodes== 0){
-				newPageRank = 0.0;
-			}
-			else{
-				newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
+			for(int i = 0; i < numIterations; i++){
+				
+				/*for( v ∈ B ) { NPR[v] = 0; }
+			    for( v ∈ B ) {
+			        for( u where <u, v> ∈ BE ) {
+			            NPR[v] += PR[u] / deg(u);
+			        }
+			        for( u, R where <u,v,R> ∈ BC ) {
+			            NPR[v] += R;
+			        }
+			        NPR[v] = d*NPR[v] + (1-d)/N;
+			    }
+			    for( v ∈ B ) { PR[v] = NPR[v]; }*/
+				
+				HashMap<Integer, Double> newPageRanks = new HashMap<Integer, Double>();
+				for(Integer v : blockEdges.keySet()){
+					newPageRanks.put(v, 0.0);
+				}
+				for(Integer v : blockEdges.keySet()){
+					for(Integer u : blockEdges.keySet()){
+						//Ensure entirety of edge is within block
+						if(blockEdges.containsKey(blockEdges.get(u))){
+							newPageRanks.put(v, pageRankValues.get(u)/blockEdges.get(u).size());
+						}
+					}
+					for(Integer u : boundaryConditions.keySet()){
+						if(boundaryConditions.get(u).contains(v)){
+							newPageRanks.put(v, newPageRanks.get(v) + pageRankValues.get(u));
+						}
+					}
+					newPageRanks.put(v, ((1-d)/totalNodes) + newPageRanks.get(v)*d);
+				}
+				for(Integer v : blockEdges.keySet()){
+					pageRankValues.put(v, newPageRanks.get(v));
+				}
 			}
 			
 			// Emit the current data
-			String sb = "";
-			sb = newPageRank + ",";
-			for (Integer edge: outlinks){
-				sb+= edge + ",";
+			for(Integer v : blockEdges.keySet()){
+				key = new Text(v + "");
+				
+				String sb = "";
+				sb = pageRankValues.get(v) + ",";
+				for (Integer edge: blockEdges.get(v)){
+					sb+= edge + ",";
+				}
+				sb = sb.substring(0, sb.length()-1);
+				System.out.println("reducer output: (" + key + ","+ sb+")");
+				output.collect(key, new Text(sb));
 			}
-			sb = sb.substring(0, sb.length()-1);
-			System.out.println("reducer output: (" + key + ","+ sb+")");
-			output.collect(key, new Text(sb));
+			
 			System.out.println("^^^^^^\n");
 		}
 	}
