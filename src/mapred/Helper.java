@@ -10,18 +10,19 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Helper {
 	static Properties pathProperties = new Properties();
-//	static File nodesTxt = new File("/media/OS_/CS5300/cs5300/nodes1.txt");
-//	static File edgesTxt = new File("/home/eric/hadoop/input_files/edges.txt");
-//	static File blocksTxt = new File("/home/eric/hadoop/input_files/blocks.txt");
+	static File nodesTxt = new File("/home/eric/hadoop/input_files/nodes.txt");
+	static File edgesTxt = new File("/home/eric/hadoop/input_files/edges.txt");
+	static File blocksTxt = new File("/home/eric/hadoop/input_files/blocks.txt");
 	
-	static File nodesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/nodes1.txt");
+	/*static File nodesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/nodes1.txt");
 	static File edgesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/edges1.txt");
-	static File blocksTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/blocks1.txt");
+	static File blocksTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/blocks1.txt");*/
 
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
-	static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	static ConcurrentHashMap<String,String> nodes= null;
 	static ArrayList<String> blocks = parseBlocks(blocksTxt);
 	
 	
@@ -341,6 +342,6 @@ public class Helper {
 	
 	
 	public static void main(String[] args) throws Exception {
-		writePRInputFile();
+		//writePRInputFile();
 	}
 }
