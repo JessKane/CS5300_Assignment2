@@ -13,11 +13,16 @@ public class Helper {
 	static File nodesTxt = new File("/home/eric/hadoop/input_files/nodes.txt");
 	static File edgesTxt = new File("/home/eric/hadoop/input_files/edges.txt");
 	static File blocksTxt = new File("/home/eric/hadoop/input_files/blocks.txt");
+	
+	/*static File nodesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/nodes1.txt");
+	static File edgesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/edges1.txt");
+	static File blocksTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/blocks1.txt");*/
 
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
 	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	static ConcurrentHashMap<String,String> nodes= null;
 	static ArrayList<String> blocks = parseBlocks(blocksTxt);
 	
 	
@@ -219,6 +224,26 @@ public class Helper {
 		return -1 + "";
 	}
 	
+	/*for EC
+	 * 
+	 * partitions edges into random blocks according to hash function
+	 */
+	public static String getBlockID_RandPart(String node){
+		return "" + (hash(node)%68);
+	}
+	
+	private static int hash(String node){
+		char ch[] = node.toCharArray();
+		int strLength = node.length();
+		
+		int i, sum;
+		
+		for (i = 0, sum = 0; i < strLength; i++)
+			sum += ch[i];
+		
+		return sum;
+	}
+	
 	/**
 	 * 
 	 * @param node
@@ -246,7 +271,7 @@ public class Helper {
 		return getInDegree(node) + getOutDegree(node);
 	}
 	
-	/*private static int writePRInputFile(){
+	private static int writePRInputFile(){
 		Double initial_PR = 1.0;
 		PrintWriter out = null;
 		int numNodes = 0;
@@ -272,6 +297,7 @@ public class Helper {
 					}
 				}
 			}
+			
 			out.write("\n");
 			System.out.println("node " + node + " done writing");
 		}
@@ -312,7 +338,7 @@ public class Helper {
 		out.close();
 		System.out.println("done writing file");
 		return numNodes;
-	}*/
+	}
 	
 	
 	public static void main(String[] args) throws Exception {

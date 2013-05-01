@@ -23,6 +23,7 @@ import org.apache.hadoop.mapred.TextOutputFormat;
 public class ConvergencePass {
 
 	static int totalNodes = 685230;
+	static double convergenceSum = 0.0;
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -36,7 +37,7 @@ public class ConvergencePass {
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
 			
-			System.out.println("mapper input: " + line);
+//			System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
 
@@ -75,11 +76,14 @@ public class ConvergencePass {
 				}
 				Text outputValue = new Text ("pr," + nodeU + "," + newPR);
 				
-				System.out.println("to red " + outputKey + " " + outputValue);
+//				System.out.println("to red " + outputKey + " " + outputValue);
 
 				output.collect(outputKey, outputValue);
 //				System.out.println("mapper output: nodeV: " + edge + ", outputVal: " + outputValue.toString());
 			}
+			
+			//output #3 : for convergence - send out old page rank
+			output.collect(new Text(nodeU.toString()), new Text("oldPR," + pageRankU.toString()));
 		}
 	}
 
@@ -97,9 +101,10 @@ public class ConvergencePass {
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
 			double pageRankSum = 0.0;
+			Double oldPR = 0.0;
 			while (values.hasNext()) {
 				String line = values.next().toString();
-				System.out.println("reducer line: " + key + " " + line);
+//				System.out.println("reducer line: " + key + " " + line);
 
 				// The two types of input are distinguished by prefix.
 				if (line.startsWith("links")) {
@@ -117,16 +122,23 @@ public class ConvergencePass {
 
 //					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
 				}
+				else if (line.startsWith("oldPR")){
+					String[] splitLine = line.split(",");
+					oldPR = Double.parseDouble(splitLine[1]);
+				}
 			}
 			
 			// Compute New PageRank Value
-			Double newPageRank = 0.0;
-			if (totalNodes== 0){
-				newPageRank = 0.0;
-			}
-			else{
-				newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
-			}
+			Double newPageRank  = ((1-d)/totalNodes) + pageRankSum*d;
+			
+			//print out convergence
+			Double convergenceValue =
+					Math.abs(oldPR - newPageRank)/newPageRank;
+			System.out.println("Convergence for node "+key+ "= " + convergenceValue);
+//			System.out.println("oldPR: " + oldPR + ", NewPR: " + newPageRank);
+//			System.out.println("----");	
+			
+			convergenceSum += convergenceValue;
 			
 			// Emit the current data
 			String sb = "";
@@ -135,15 +147,15 @@ public class ConvergencePass {
 				sb+= edge + ",";
 			}
 			sb = sb.substring(0, sb.length()-1);
-			System.out.println("reducer output: (" + key + ","+ sb+")");
+//			System.out.println("reducer output: (" + key + ","+ sb+")");
 			output.collect(key, new Text(sb));
-			System.out.println("^^^^^^\n");
+//			System.out.println("^^^^^^\n");
 		}
 	}
 
 	public static void main(String[] args) throws Exception {
 		JobConf conf = new JobConf(ConvergencePass.class);
-		conf.setJobName("simple_page_rank");
+		conf.setJobName("convergence_pass");
 
 		conf.setOutputKeyClass(Text.class);
 		conf.setOutputValueClass(Text.class);
@@ -164,5 +176,7 @@ public class ConvergencePass {
 		conf.setNumReduceTasks(1);
 		
 		JobClient.runJob(conf);
+		
+		System.out.println("convergence: " + convergenceSum/totalNodes);
 	}
 }

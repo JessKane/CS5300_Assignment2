@@ -23,7 +23,8 @@ import org.apache.hadoop.mapred.TextOutputFormat;
 public class BlockedPageRank {
 
 	static int totalNodes = 685230;
-	
+	static Double convergenceBound = 0.001;
+
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -35,35 +36,53 @@ public class BlockedPageRank {
 		// 2: for each outgoing node, pagerank/deg(u)
 		
 		//Helper helper = new Helper();
+	
+		boolean useGaussSeidel;
+		boolean useRandomBlocking;
+		int numIterations = -1;
+		public void configure(JobConf job){
+			if(job.get("useGaussSeidel").equals("true")){
+				useGaussSeidel = true;
+			} else{
+				useGaussSeidel = false;
+			}
+			
+			if(job.get("useRandomBlocking").equals("true")){
+				useRandomBlocking = true;
+			} else{
+				useRandomBlocking = false;
+			}
+			
+			if(job.get("numIterations") != null){
+				numIterations = Integer.parseInt(job.get("numIterations"));
+			}
+		}
 		
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
-			
 			System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
-			String blockId = Helper.getBlockId(nodeId);
+			System.out.println("BREAK1 " + useGaussSeidel + " " + numIterations);
+			
+			String blockId = useRandomBlocking?Helper.getBlockID_RandPart(nodeId):Helper.getBlockId(nodeId);
 					
 			// Collect Input
 			Integer nodeU = Integer.parseInt(nodeId);
 			Double pageRankU = Double.parseDouble(mapInput[0]);
 			ArrayList<Integer> outgoingEdges = new ArrayList<Integer>();
 			for (int i = 1; i < mapInput.length; i++) {
-				//NOT SURE IF THIS IS NECESSARY
-				//But i don't think we need edges going OUT of the block
-				
-				
 				outgoingEdges.add(Integer.parseInt(mapInput[i]));
-				
-				//Output #1 Edges within (or directed out of of) the block
-				//Contains full PR value of node
 			}
-			output.collect(new Text(blockId), new Text("BE,"+line));
+			//Output #1 All out-edges for this node sent to node's block
+			//Contains full PR value of node
+			output.collect(new Text(blockId), new Text("BE,"+line.replace("\t", ",")));
 			
 			
-			// Output #2: send partial pagerank along edges entering different blocks
+			// Output #2: All edges to new blocks sent to recieving node's block
+			//Contains partial PR's of emitting node
 			for (Integer edge: outgoingEdges) {
-				String recvBlock = Helper.getBlockId(edge + "");
+				String recvBlock = useRandomBlocking?Helper.getBlockID_RandPart(edge + ""):Helper.getBlockId(edge + "");
 				if(!recvBlock.equals(blockId)){
 					Text outputKey = new Text (recvBlock);
 
@@ -79,7 +98,6 @@ public class BlockedPageRank {
 					System.out.println("to red " + outputKey + " " + outputValue);
 
 					output.collect(outputKey, outputValue);
-//					System.out.println("mapper output: nodeV: " + edge + ", outputVal: " + outputValue.toString());
 				}
 			}
 		}
@@ -93,55 +111,249 @@ public class BlockedPageRank {
 		// d is dampening
 		// emit: current node v, pr(v), {w|v->w}
 		
-		int numIterations = 3;
+		
+		HashMap<Integer,Double> pageRankValues;
+		
+		boolean useGaussSeidel;
+		boolean useRandomBlocking;
+		int numIterations = -1;
+		public void configure(JobConf job){
+			if(job.get("useGaussSeidel").equals("true")){
+				useGaussSeidel = true;
+			} else{
+				useGaussSeidel = false;
+			}
+			
+			if(job.get("useRandomBlocking").equals("true")){
+				useRandomBlocking = true;
+			} else{
+				useRandomBlocking = false;
+			}
+			
+			if(job.get("numIterations") != null){
+				numIterations = Integer.parseInt(job.get("numIterations"));
+			}
+		}
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
+			System.out.println("BREAK2 " + useGaussSeidel + " " + numIterations);
+			
 			// Get the input
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
-			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
+			pageRankValues = new HashMap<Integer,Double>();
+			HashMap<Integer, ArrayList<Integer>> boundaryConditions = new  HashMap<Integer, ArrayList<Integer>>();
+			
+			//Edges in block of Emitting to Reciving Nodes
+			HashMap<Integer,ArrayList<Integer>> blockEdgesE2R = new  HashMap<Integer, ArrayList<Integer>>();
+			
+			//Edges in block of Reciving to Emitting Nodes
+			HashMap<Integer,ArrayList<Integer>> blockEdgesR2E = new  HashMap<Integer, ArrayList<Integer>>();
+
 			double pageRankSum = 0.0;
 			while (values.hasNext()) {
 				String line = values.next().toString();
-				System.out.println("reducer line: " + key + " " + line);
-
+				//System.out.println("reducer line: " + key + " " + line);
+				
+				String[] splitLine = line.split(",");
+				Integer emitNode = Integer.parseInt(splitLine[1]);
+				Double pageRank = Double.parseDouble(splitLine[2]);
+				ArrayList<Integer> recvNodes = new ArrayList<Integer>();
+				for (int i = 3; i < splitLine.length; i++) { 
+					recvNodes.add(Integer.parseInt(splitLine[i]));
+				}
+				
+				pageRankValues.put(emitNode, pageRank);
+				
 				// The two types of input are distinguished by prefix.
 				if (line.startsWith("BE,")) {
-					String[] splitLine = line.split(",");
-					for (int i = 1; i < splitLine.length; i++) { // we don't care about the prefix
-						outlinks.add(Integer.parseInt(splitLine[i]));
-					}
-//					System.out.println("outlinks: " + outlinks);
-				} else if (line.startsWith("BC,")) {
-					String[] splitLine = line.split(",");
 					
-					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
-					pageRankSum += Double.parseDouble(splitLine[2]);
-
-//					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+					//Emitter ---> Receiving nodes, only necessary for ordering in Gauss-Seidel
+					if(blockEdgesE2R.containsKey(emitNode)){
+						blockEdgesE2R.get(emitNode).addAll(recvNodes);
+					}
+					else{
+						blockEdgesE2R.put(emitNode, recvNodes);
+					}
+					
+					//Reverse the lookup behavior (Receiving ----> ALL Emitting nodes) to boost lookup time in block iterations
+					for(Integer recvNode : recvNodes){
+						if(blockEdgesR2E.containsKey(recvNode)){
+							blockEdgesR2E.get(recvNode).add(emitNode);
+						} else{
+							ArrayList<Integer> emitHolder = new ArrayList<Integer>();
+							emitHolder.add(emitNode);
+							blockEdgesR2E.put(recvNode, emitHolder);
+						}
+					}
+					
+				} else if (line.startsWith("BC,")) {
+					
+					//Reverse the lookup behavior (Receiving ----> ALL Emitting nodes) to boost lookup time in block iterations
+					for(Integer recvNode : recvNodes){
+						if(boundaryConditions.containsKey(recvNode)){
+							boundaryConditions.get(recvNode).add(emitNode);
+						} else{
+							ArrayList<Integer> emitHolder = new ArrayList<Integer>();
+							emitHolder.add(emitNode);
+							boundaryConditions.put(recvNode, emitHolder);
+						}
+					}
 				}
 			}
 			
-			// Compute New PageRank Value
-			Double newPageRank = 0.0;
-			if (totalNodes== 0){
-				newPageRank = 0.0;
-			}
+			
+			ArrayList<Integer> orderedNodes;
+			//Sort block elements according to decreasing number of outbound edges for each edge
+			if(useGaussSeidel){
+				orderedNodes = merge_sort(new ArrayList<Integer> (blockEdgesE2R.keySet()), blockEdgesE2R);
+			} 
+			//If not using GaussSeidel, order doesn't matter
 			else{
-				newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
+				orderedNodes = new ArrayList<Integer> (blockEdgesE2R.keySet());
 			}
 			
-			// Emit the current data
-			String sb = "";
-			sb = newPageRank + ",";
-			for (Integer edge: outlinks){
-				sb+= edge + ",";
+			//Iterate through block
+			if(numIterations > 0){
+				for(int i = 0; i < numIterations; i++){
+					IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions);
+				}
+			} else{
+				Double avgErr = Double.MAX_VALUE;
+				int iterationsUsed = 0;
+				while(avgErr > convergenceBound){
+					avgErr = IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions);
+					iterationsUsed++;
+				}
+				System.out.println("ITERATIONS USED ON BLOCK" + key + ": " + iterationsUsed);
 			}
-			sb = sb.substring(0, sb.length()-1);
-			System.out.println("reducer output: (" + key + ","+ sb+")");
-			output.collect(key, new Text(sb));
+			
+			
+			// Emit the current data
+			for(Integer v : blockEdgesE2R.keySet()){
+				key = new Text(v + "");
+				
+				String sb = "";
+				sb = pageRankValues.get(v) + ",";
+				for (Integer edge: blockEdgesE2R.get(v)){
+					sb+= edge + ",";
+				}
+				sb = sb.substring(0, sb.length()-1);
+				//System.out.println("reducer output: (" + key + ","+ sb+")");
+				output.collect(key, new Text(sb));
+			}
+			
 			System.out.println("^^^^^^\n");
 		}
+		
+		public ArrayList<Integer> merge_sort(ArrayList<Integer> m, HashMap<Integer,ArrayList<Integer>> blockEdgesE2R ){
+		    // if list size is 0 (empty) or 1, consider it sorted and return it
+		    // (using less than or equal prevents infinite recursion for a zero length m)
+		    if(m.size() <= 1)
+		        return m;
+		    // else list size is > 1, so split the list into two sublists
+		    ArrayList<Integer> left = new ArrayList<Integer>();
+		    ArrayList<Integer> right = new ArrayList<Integer>();
+
+		    int middle = m.size() / 2;
+		    
+		    for(int i = 0; i < m.size(); i++){
+		    	if(i < middle){
+		    		left.add(m.get(i));
+		    	} else{
+		    		right.add(m.get(i));
+		    	}
+		    }
+		    
+		    // recursively call merge_sort() to further split each sublist
+		    // until sublist size is 1
+		    left = merge_sort(left, blockEdgesE2R);
+		    right = merge_sort(right, blockEdgesE2R);
+		    // merge the sublists returned from prior calls to merge_sort()
+		    // and return the resulting merged sublist
+		    return merge(left, right, blockEdgesE2R);
+		}
+		
+		public ArrayList<Integer> merge(ArrayList<Integer> left, ArrayList<Integer> right, HashMap<Integer,ArrayList<Integer>> blockEdgesE2R ){
+			ArrayList<Integer> result = new ArrayList<Integer>();
+
+			while(left.size() > 0 || right.size() > 0){
+				if(left.size() > 0 && right.size() > 0){
+					if(blockEdgesE2R.get(left.get(0)).size() >= blockEdgesE2R.get(right.get(0)).size()){
+						result.add(left.remove(0));
+					} else{
+						result.add(right.remove(0));
+					}
+				} else if(left.size() > 0){
+					result.add(left.remove(0));
+				} else if(right.size() > 0){
+					result.add(right.remove(0));
+				}
+			}
+			return result;
+		}
+		
+		
+		public Double IterateBlockOnce(ArrayList<Integer> orderedNodes, HashMap<Integer, ArrayList<Integer>> blockEdgesE2R, 
+				HashMap<Integer, ArrayList<Integer>> blockEdgesR2E, HashMap<Integer, ArrayList<Integer>> boundaryConditions){
+			/*for( v ∈ B ) { NPR[v] = 0; }
+		    for( v ∈ B ) {
+		        for( u where <u, v> ∈ BE ) {
+		            NPR[v] += PR[u] / deg(u);
+		        }
+		        for( u, R where <u,v,R> ∈ BC ) {
+		            NPR[v] += R;
+		        }
+		        NPR[v] = d*NPR[v] + (1-d)/N;
+		    }
+		    for( v ∈ B ) { PR[v] = NPR[v]; }*/
+			
+			ArrayList<Double> errorVals = new ArrayList<Double>();
+			HashMap<Integer, Double> newPageRanks = new HashMap<Integer, Double>();
+			for(Integer v : orderedNodes){
+				newPageRanks.put(v, 0.0);
+			}
+			for(Integer v : orderedNodes){
+				if(blockEdgesR2E.containsKey(v)){
+					for(Integer u : blockEdgesR2E.get(v)){
+						//Should be implicitly an edge in the block
+						//if(blockEdges.keySet().contains(u)){
+							newPageRanks.put(v, newPageRanks.get(v) + pageRankValues.get(u)/blockEdgesE2R.get(u).size());
+						//}
+					}
+				}
+				
+				if(boundaryConditions.containsKey(v)){
+					for(Integer u : boundaryConditions.get(v)){
+						newPageRanks.put(v, newPageRanks.get(v) + pageRankValues.get(u));
+					}
+				}
+				
+				Double newPageRank = ((1-d)/totalNodes) + newPageRanks.get(v)*d;
+				errorVals.add(Math.abs(pageRankValues.get(v) - newPageRank) / newPageRank);
+				if(useGaussSeidel){
+					pageRankValues.put(v, newPageRank);
+				} else{
+					newPageRanks.put(v, newPageRank);
+				}
+				
+			}
+			if(!useGaussSeidel){
+				for(Integer v : orderedNodes){
+					pageRankValues.put(v, newPageRanks.get(v));
+				}
+			}
+			
+			//Return Average residual error
+			Double errSum= 0.0; 
+		     for (Double i:errorVals){
+		    	 errSum += i;
+		     }
+			return errSum / errorVals.size();
+		}
 	}
+	
+	
+	
 
 	public static void main(String[] args) throws Exception {
 		
@@ -156,14 +368,37 @@ public class BlockedPageRank {
 
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
-		
-		conf.setNumReduceTasks(1);
 
 		FileInputFormat.setInputPaths(conf, new Path(args[0]));
 		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
 		
-		conf.setNumMapTasks(1);
-		conf.setNumReduceTasks(1);
+		conf.set("useGaussSeidel", "false");
+		conf.set("useRandomBlocking", "false");
+		
+		//Check for additional parameter
+		if(args.length > 2){
+			if(args[2].equals("gaussSeidel")){
+				conf.set("useGaussSeidel", "true");
+			} else if(args[2].equals("randomBlocking")){
+				conf.set("useRandomBlocking", "true");
+			} else{
+				try{
+					conf.set("numIterations", Integer.parseInt(args[2]) + "");
+				} catch(NumberFormatException e){
+					System.out.println("Unknown third argument.  Please either remove, provide a numerical number of block iterations, or use 'gaussSeidel' or 'randomBlocking'.");
+					return;
+				}
+			}
+		}
+		if(args.length > 3){
+			try{
+				conf.set("numIterations", Integer.parseInt(args[3]) + "");
+			} catch(NumberFormatException e){
+				System.out.println("Unknown fourth argument.  Please either remove or provide a numerical number of block iterations.");
+				return;
+			}
+		}
+		
 		
 		JobClient.runJob(conf);
 	}
