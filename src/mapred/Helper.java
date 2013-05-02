@@ -12,8 +12,8 @@ public class Helper {
 	static Properties pathProperties = new Properties();
 	
 	//Don't change these now, they're they're linked to the textfiles in the same location as the class file.
-	static String nodesTxt = "nodes.txt";
-	static String edgesTxt = "edges.txt";
+	static String nodesTxt = "input_files/nodes.txt";
+	static String edgesTxt = "input_files/edges.txt";
 	static String blocksTxt = "blocks.txt";
 
 	static double fromNetID = 0.46;
@@ -284,7 +284,7 @@ public class Helper {
 	}
 	
 	private int writePRInputFile(){
-		Double initial_PR = 1.0;
+		Double initial_PR = 1.0/685230;
 		PrintWriter out = null;
 		int numNodes = 0;
 		try {
@@ -334,6 +334,7 @@ public class Helper {
 	
 	
 	public static void main(String[] args) throws Exception {
-		//writePRInputFile();
+		Helper helper = new Helper();
+		helper.writePRInputFile();
 	}
 }
