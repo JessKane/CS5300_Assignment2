@@ -20,6 +20,10 @@ import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.TextOutputFormat;
 import org.apache.hadoop.mapreduce.Job;
 
+/**
+ * MapReduce PageRank, with each node having it's own reducer.
+ *
+ */
 public class SimplePageRank {
 
 	static int totalNodes = 685230;
@@ -27,20 +31,22 @@ public class SimplePageRank {
 	//used for Hadoop Counters (to "preserve" double values)
 	static double counterMultiplier = 100000000.0;
 
-	
 	public static enum MATCH_COUNTER {
 		CONVERGENCE
 	};
 	
+	/**
+	 * The mapper. Takes in a file with info on each node, and sends the appropriate data to 
+	 * each reducer. 
+	 * 
+	 * File format: list of (current node u, pr(u), {v|u->v})
+	 * 
+	 * Output: 
+     * 1: a list of all edges {u, v|u->v}
+     * 2: for each outgoing node, pagerank/deg(u)
+	 * 3: for each node, the original PageRank value (used to calculate convergence)
+	 */
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
-		// file with list of (current node u, pr(u), {v|u->v})
-		// input: one line: (current node u, pr(u), {v|u->v})
-		// 			int,double,int,int,(repeating int-int)
-
-		// output: node v, {{w|v->w},{PR(u)/deg(u) | u->v}}
-		// 1: a list of all edges {u, v|u->v}
-		// 2: for each outgoing node, pagerank/deg(u)
-		// 3: for each node, the original PageRank value (used to calculate convergence)
 		
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
@@ -91,13 +97,15 @@ public class SimplePageRank {
 		}
 	}
 
+	/**
+	 * The reducer, for a single node. Takes mapper input, and writes the appropriate output file. 
+	 * 
+	 * Input: node v, {{w|v->w},{PR(u)/deg(u) | u->v}}
+	 * Compute: PR(v) = (1-d)/N + d~(PR(u)/deg(u))
+	 * Output: current node v, pr(v), {w|v->w}
+	 */
 	public static class Reduce extends MapReduceBase implements Reducer<Text, Text, Text, Text> {
 		private static double d = 0.85;
-
-		// input: node v, {{w|v->w},{PR(u)/deg(u) | u->v}},
-		// compute: PR(v) = (1-d)/N + d~(PR(u)/deg(u))
-		// d is dampening
-		// emit: current node v, pr(v), {w|v->w}
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			// Get the input			
