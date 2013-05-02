@@ -19,39 +19,40 @@ public class Helper {
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
-	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	//ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
 	ConcurrentHashMap<String,String> nodes= null;
 	ArrayList<String> blocks = parseBlocks(blocksTxt);
+	static int totalNodes = 685230;
 	
 	
-	private static ConcurrentHashMap<String, String> parseNodes(File nodesTxt){
+	private ConcurrentHashMap<String, String> parseNodes(String nodesTxt){
 		System.out.println("parsing nodes");
-		Scanner scanner = null;
+		InputStream is = getClass().getResourceAsStream(nodesTxt);
+	    InputStreamReader isr = new InputStreamReader(is);
+	    BufferedReader br = new BufferedReader(isr);
+	    String line;
+	    
 	    ConcurrentHashMap<String,String> nodes= new ConcurrentHashMap<String, String>();
 		//scanner = new Scanner(nodesTxt);
 	    
-	    pathProperties.getClass();
-		try {
-			scanner = new Scanner(nodesTxt);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
+	    try {
+			while ((line = br.readLine()) != null) {
+				String result[] = line.split("\\s+");
+//		        System.out.println(result[0]+ ", " +result[1]);
+		        if (result[0].equals("")){
+		        	nodes.put(result[1], result[2]);
+		        }
+		        else{
+		        	nodes.put(result[0], result[1]);
+		        }
+			}
+			br.close();
+		    isr.close();
+		    is.close();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
-		
-	    while(scanner.hasNext()){
-	        String line = (scanner.nextLine());
-	        String result[] = line.split("\\s+");
-//	        System.out.println(result[0]+ ", " +result[1]);
-	        if (result[0].equals("")){
-	        	nodes.put(result[1], result[2]);
-	        }
-	        else{
-	        	nodes.put(result[0], result[1]);
-	        }
-	    }
 	    
-	    scanner.close();
 		return nodes;
 	}
 	
@@ -284,7 +285,7 @@ public class Helper {
 	}
 	
 	private int writePRInputFile(){
-		Double initial_PR = 1.0/685230;
+		Double initial_PR = 1.0/totalNodes;
 		PrintWriter out = null;
 		int numNodes = 0;
 		try {
@@ -334,7 +335,7 @@ public class Helper {
 	
 	
 	public static void main(String[] args) throws Exception {
-		Helper helper = new Helper();
-		helper.writePRInputFile();
+		//Helper h = new Helper();
+		//h.writePRInputFile();
 	}
 }

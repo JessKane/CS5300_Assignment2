@@ -31,7 +31,6 @@ public class BlockedPageRank {
 			PR_RESIDUAL_SUM,
 			BLOCK_ITER_SUM
 		};
-
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -46,7 +45,6 @@ public class BlockedPageRank {
 	
 		boolean useGaussSeidel;
 		boolean useRandomBlocking;
-		int numIterations = -1;
 		public void configure(JobConf job){
 			if(job.get("useGaussSeidel").equals("true")){
 				useGaussSeidel = true;
@@ -60,14 +58,11 @@ public class BlockedPageRank {
 				useRandomBlocking = false;
 			}
 			
-			if(job.get("numIterations") != null){
-				numIterations = Integer.parseInt(job.get("numIterations"));
-			}
 		}
 		
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			String line = value.toString();
-			System.out.println("mapper input: " + line);
+			//System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
 			
@@ -101,7 +96,7 @@ public class BlockedPageRank {
 					}
 					Text outputValue = new Text ("BC," + nodeU + "," + newPR + "," + edge);
 					
-					System.out.println("to red " + outputKey + " " + outputValue);
+					//System.out.println("to red " + outputKey + " " + outputValue);
 
 					output.collect(outputKey, outputValue);
 				}
@@ -122,7 +117,6 @@ public class BlockedPageRank {
 		
 		boolean useGaussSeidel;
 		boolean useRandomBlocking;
-		int numIterations = -1;
 		public void configure(JobConf job){
 			if(job.get("useGaussSeidel").equals("true")){
 				useGaussSeidel = true;
@@ -136,9 +130,6 @@ public class BlockedPageRank {
 				useRandomBlocking = false;
 			}
 			
-			if(job.get("numIterations") != null){
-				numIterations = Integer.parseInt(job.get("numIterations"));
-			}
 		}
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
@@ -220,25 +211,21 @@ public class BlockedPageRank {
 			@SuppressWarnings("unchecked")
 			HashMap<Integer, Double> pageRankCopy = (HashMap<Integer, Double>) pageRankValues.clone();
 			
-			//Iterate through block
-			if(numIterations > 0){
-				for(int i = 0; i < numIterations; i++){
-					IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions, reporter);
-				}
-			} else{
-				Double avgErr = Double.MAX_VALUE;
-				int iterationsUsed = 0;
-				while(avgErr > convergenceBound){
-					avgErr = IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions, reporter);
-					iterationsUsed++;
-				}
-				System.out.println("ITERATIONS USED ON BLOCK" + key + ": " + iterationsUsed);
-				reporter.getCounter(MATCH_COUNTER.BLOCK_ITER_SUM).increment(iterationsUsed);
+			//Iterate through block until inner block convergence
+			Double avgErr = Double.MAX_VALUE;
+			int iterationsUsed = 0;
+			while(avgErr > convergenceBound){
+				avgErr = IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions, reporter);
+				iterationsUsed++;
 			}
+			System.out.println("ITERATIONS USED ON BLOCK" + key + ": " + iterationsUsed);
+			reporter.getCounter(MATCH_COUNTER.BLOCK_ITER_SUM).increment(iterationsUsed);
 			
 			//Calculate residuals
 			for(Integer node : blockEdgesE2R.keySet()){
 				Integer inc = (int) (Math.abs(pageRankCopy.get(node) - pageRankValues.get(node)) / pageRankValues.get(node) * counterMultiplier);
+				//System.out.println("Node " + node + ": Resiual " + (Math.abs(pageRankCopy.get(node) - pageRankValues.get(node)) / pageRankValues.get(node)));
+				//System.out.println("Node " + node + ": Resiual multiplied " + inc);
 				reporter.getCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).increment(inc);
 			}
 			
@@ -253,7 +240,6 @@ public class BlockedPageRank {
 					sb+= edge + ",";
 				}
 				sb = sb.substring(0, sb.length()-1);
-				//System.out.println("reducer output: (" + key + ","+ sb+")");
 				output.collect(key, new Text(sb));
 			}
 			
@@ -344,7 +330,7 @@ public class BlockedPageRank {
 					}
 				}
 				
-				Double newPageRank = ((1-d)/ totalNodes) + newPageRanks.get(v)*d;
+				Double newPageRank = ((1-d)/totalNodes) + newPageRanks.get(v)*d;
 				
 				errorVals.add(Math.abs(pageRankValues.get(v) - newPageRank) / newPageRank);
 				if(useGaussSeidel){
@@ -374,7 +360,58 @@ public class BlockedPageRank {
 
 	public static void main(String[] args) throws Exception {
 		Helper helper = new Helper();
+		boolean useGS = false;
+		boolean useRB = false;
+		boolean untilConverge = false;
+		int numPasses = 1;
 		
+		//Check for additional parameter
+		if(args.length > 2){
+			if(args[2].equals("gaussSeidel")){
+				useGS = true;
+			} else if(args[2].equals("randomBlocking")){
+				useRB = true;
+			} else if(args[2].equals("untilConverge")){
+				untilConverge = true;
+			} else{
+				try{
+					numPasses = Integer.parseInt(args[2]);
+				} catch(NumberFormatException e){
+					System.out.println("Unknown third argument.  Please either remove, provide a numerical number of mapred passes, or use 'gaussSeidel' or 'randomBlocking'.");
+					return;
+				}
+			}
+		}
+		if(args.length > 3){
+			 if(args[3].equals("untilConverge")){
+				untilConverge = true;
+			} else if(!untilConverge){
+				try{
+					numPasses = Integer.parseInt(args[3]);
+				} catch(NumberFormatException e){
+					System.out.println("Unknown fourth argument.  Please either remove or provide a numerical number of mapred passes.");
+					return;
+				}
+			}
+		}
+		
+		if(untilConverge){
+			double avgResidual = Double.MAX_VALUE;
+			int pass = 0;
+			numPasses = Integer.MAX_VALUE;
+			while(avgResidual > convergenceBound){
+				avgResidual = runPass(args, useGS, useRB, pass, numPasses, helper);
+				pass++;
+			}
+			System.out.println("Finished Overall Convergence");
+		} else{
+			for(int pass = 0; pass < numPasses; pass++){
+				runPass(args, useGS, useRB, pass, numPasses, helper);
+			}
+		}
+	}
+
+	private static double runPass(String[] args, boolean useGS, boolean useRB, int pass, int numPasses, Helper helper) {
 		JobConf conf = new JobConf(BlockedPageRank.class);
 		conf.setJobName("blocked_page_rank");
 
@@ -387,45 +424,44 @@ public class BlockedPageRank {
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
 
-		FileInputFormat.setInputPaths(conf, new Path(args[0]));
-		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
-		
-		conf.set("useGaussSeidel", "false");
-		conf.set("useRandomBlocking", "false");
-		
-		//Check for additional parameter
-		if(args.length > 2){
-			if(args[2].equals("gaussSeidel")){
-				conf.set("useGaussSeidel", "true");
-			} else if(args[2].equals("randomBlocking")){
-				conf.set("useRandomBlocking", "true");
-			} else{
-				try{
-					conf.set("numIterations", Integer.parseInt(args[2]) + "");
-				} catch(NumberFormatException e){
-					System.out.println("Unknown third argument.  Please either remove, provide a numerical number of block iterations, or use 'gaussSeidel' or 'randomBlocking'.");
-					return;
-				}
-			}
+		if(pass == 0){
+			FileInputFormat.setInputPaths(conf, new Path(args[0]));
+		}else{
+			FileInputFormat.setInputPaths(conf, new Path(args[1] + (pass - 1)));
 		}
-		if(args.length > 3){
-			try{
-				conf.set("numIterations", Integer.parseInt(args[3]) + "");
-			} catch(NumberFormatException e){
-				System.out.println("Unknown fourth argument.  Please either remove or provide a numerical number of block iterations.");
-				return;
-			}
-		}
+		FileOutputFormat.setOutputPath(conf, new Path(args[1] + pass));
 		
-		 Job job = new Job(conf);
-		 job.waitForCompletion(true);
-
+		conf.set("useGaussSeidel", useGS + "");
+		conf.set("useRandomBlocking", useRB + "");
 		
-		 System.out.println("Total residual " + job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier);
-		 System.out.println("Average residual " + job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier 
-				 / totalNodes);
-		 System.out.println("Average block iterations: " + job.getCounters().findCounter(MATCH_COUNTER.BLOCK_ITER_SUM).getValue() / helper.blocks.size());
+		 Job job;
 		 
+		try {
+			job = new Job(conf);
+			job.waitForCompletion(true);
 
+			if(numPasses > 1){
+				System.out.println("Pass number " + (pass + 1));
+			}
+			 
+			 System.out.println("Total residual: " + job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier);
+			 double avgResidual = job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier 
+					 / totalNodes;
+			 System.out.println("Average residual: " + avgResidual);
+			 
+			 System.out.println("Average block iterations: " + job.getCounters().findCounter(MATCH_COUNTER.BLOCK_ITER_SUM).getValue() * 1.0 / helper.blocks.size());
+			 
+			 return avgResidual;
+			 
+		} catch (IOException e) {
+
+			e.printStackTrace();
+		} catch(InterruptedException e){
+			e.printStackTrace();
+		} catch(ClassNotFoundException e){
+			e.printStackTrace();
+		}
+		 
+		return Double.MAX_VALUE;
 	}
 }
