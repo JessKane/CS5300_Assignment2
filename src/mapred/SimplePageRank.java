@@ -1,6 +1,9 @@
 package mapred;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,10 +22,18 @@ import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.TextOutputFormat;
+import org.apache.hadoop.mapreduce.Job;
 
 public class SimplePageRank {
 
-	static int totalNodes = 6;
+	static int totalNodes = 685230;
+	static double convergenceSum = 0.0;
+	static double counterMultiplier = 100000000.0;
+
+	
+	public static enum MATCH_COUNTER {
+		CONVERGENCE
+	};
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -36,7 +47,7 @@ public class SimplePageRank {
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
 
-			System.out.println("mapper input: " + line);
+//			System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
 
@@ -75,11 +86,14 @@ public class SimplePageRank {
 				}
 				Text outputValue = new Text ("pr," + nodeU + "," + newPR);
 				
-				System.out.println("to red " + outputKey + " " + outputValue);
+//				System.out.println("to red " + outputKey + " " + outputValue);
 
 				output.collect(outputKey, outputValue);
 //				System.out.println("mapper output: nodeV: " + edge + ", outputVal: " + outputValue.toString());
 			}
+
+            //output #3 : for convergence - send out old page rank
+			output.collect(new Text(nodeU.toString()), new Text("oldPR," + pageRankU.toString()));
 		}
 	}
 
@@ -93,13 +107,14 @@ public class SimplePageRank {
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			// Get the input			
-			System.out.println("vvvvvv Reducer " + key.toString());
+//			System.out.println("vvvvvv Reducer " + key.toString());
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
 			double pageRankSum = 0.0;
+			Double oldPR = 0.0;
 			while (values.hasNext()) {
 				String line = values.next().toString();
-				System.out.println("reducer line: " + key + " " + line);
+//				System.out.println("reducer line: " + key + " " + line);
 
 				// The two types of input are distinguished by prefix.
 				if (line.startsWith("links")) {
@@ -115,19 +130,31 @@ public class SimplePageRank {
 					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
 					pageRankSum += Double.parseDouble(splitLine[2]);
 
-					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+//					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+				}
+				else if (line.startsWith("oldPR")){
+					String[] splitLine = line.split(",");
+					oldPR = Double.parseDouble(splitLine[1]);
 				}
 			}
 			
 			// Compute New PageRank Value
 
-			Double newPageRank = 0.0;
-			if (totalNodes== 0){
-				newPageRank = 0.0;
+			Double newPageRank = (1-d) + pageRankSum*d;
+			
+			//print out convergence
+			Double convergenceValue =
+					Math.abs(oldPR - newPageRank)/newPageRank;
+//			System.out.println("Convergence for node "+key+ "= " + convergenceValue);
+//			System.out.println("oldPR: " + oldPR + ", NewPR: " + newPageRank);
+//			System.out.println("----");	
+			
+			if((long)(convergenceValue*counterMultiplier)< 0){
+				System.out.println("-----------LONG convergence value <" + 
+						(long)(convergenceValue*counterMultiplier) + "> is negative.-----------");
 			}
-			else{
-				newPageRank = (1-d) + pageRankSum*d;
-			}
+			convergenceSum += convergenceValue;
+			reporter.getCounter(MATCH_COUNTER.CONVERGENCE).increment((long) (convergenceValue*counterMultiplier));
 			
 			// Emit the current data
 			String sb = "";
@@ -136,29 +163,52 @@ public class SimplePageRank {
 				sb+= edge + ",";
 			}
 			sb = sb.substring(0, sb.length()-1);
-			System.out.println("reducer output: (" + key + ","+ sb+")");
+//			System.out.println("reducer output: (" + key + ","+ sb+")");
 			output.collect(key, new Text(sb));
-			System.out.println("^^^^^^\n");
+//			System.out.println("^^^^^^\n");
 		}
 	}
 
-	public static void main(String[] args) throws Exception {
-		JobConf conf = new JobConf(SimplePageRank.class);
-		conf.setJobName("simple_page_rank");
-
-		conf.setOutputKeyClass(Text.class);
-		conf.setOutputValueClass(Text.class);
-
-		conf.setMapperClass(Map.class);
-//		conf.setCombinerClass(Reduce.class);
-		conf.setReducerClass(Reduce.class);
-
-		conf.setInputFormat(TextInputFormat.class);
-		conf.setOutputFormat(TextOutputFormat.class);
-
-		FileInputFormat.setInputPaths(conf, new Path(args[0]));
-		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
+	/**
+	 * 
+	 * @param args: args[0] = input, args[1] = output, args[2] = number of passes
+	 * @throws Exception
+	 */
+	public static void main(String[] args) throws Exception{
+		ArrayList<Double> convergences = new ArrayList<Double>();
+		int numPasses = 1;
+		if (args.length >= 3){
+			numPasses = Integer.parseInt(args[2]);
+		}
+		for (int pass = 0; pass < numPasses; pass++){
+			JobConf conf = new JobConf(SimplePageRank.class);
+			conf.setJobName("simple_page_rank");
+	
+			conf.setOutputKeyClass(Text.class);
+			conf.setOutputValueClass(Text.class);
+	
+			conf.setMapperClass(Map.class);
+			conf.setReducerClass(Reduce.class);
+	
+			conf.setInputFormat(TextInputFormat.class);
+			conf.setOutputFormat(TextOutputFormat.class);
+	
+			if(pass == 0){
+				FileInputFormat.setInputPaths(conf, new Path(args[0]));
+			}else{
+				FileInputFormat.setInputPaths(conf, new Path(args[1] + (pass - 1)));
+			}
+			FileOutputFormat.setOutputPath(conf, new Path(args[1] + pass));
+				
+			Job job = new Job(conf);
+			 job.waitForCompletion(true);
+			
+			convergences.add(pass,(job.getCounters().findCounter(MATCH_COUNTER.CONVERGENCE).getValue()) / counterMultiplier / totalNodes);
+		}
 		
-		JobClient.runJob(conf);
+		for (int pass = 0; pass < convergences.size(); pass++){
+			System.out.println("Convergence for pass " + pass + ": " + convergences.get(pass));
+		}
 	}
 }
+
