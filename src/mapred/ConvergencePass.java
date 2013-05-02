@@ -166,14 +166,9 @@ public class ConvergencePass {
 
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
-		
-		conf.setNumReduceTasks(1);
 
 		FileInputFormat.setInputPaths(conf, new Path(args[0]));
 		FileOutputFormat.setOutputPath(conf, new Path(args[1]));
-		
-		conf.setNumMapTasks(1);
-		conf.setNumReduceTasks(1);
 		
 		JobClient.runJob(conf);
 		

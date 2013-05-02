@@ -10,20 +10,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Helper {
 	static Properties pathProperties = new Properties();
-	static File nodesTxt = new File("/home/eric/hadoop/input_files/nodes.txt");
-	static File edgesTxt = new File("/home/eric/hadoop/input_files/edges.txt");
-	static File blocksTxt = new File("/home/eric/hadoop/input_files/blocks.txt");
 	
-	/*static File nodesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/nodes1.txt");
-	static File edgesTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/edges1.txt");
-	static File blocksTxt = new File("/media/OS_/CS5300/cs5300_proj2/input_files/blocks1.txt");*/
+	//Don't change these now, they're they're linked to the textfiles in the same location as the class file.
+	static String nodesTxt = "nodes.txt";
+	static String edgesTxt = "edges.txt";
+	static String blocksTxt = "blocks.txt";
 
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
 	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
-	static ConcurrentHashMap<String,String> nodes= null;
-	static ArrayList<String> blocks = parseBlocks(blocksTxt);
+	ConcurrentHashMap<String,String> nodes= null;
+	ArrayList<String> blocks = parseBlocks(blocksTxt);
 	
 	
 	private static ConcurrentHashMap<String, String> parseNodes(File nodesTxt){
@@ -58,107 +56,118 @@ public class Helper {
 	}
 	
 	
-	private static ArrayList<String> parseBlocks(File blocksTxt){
+	private ArrayList<String> parseBlocks(String blocksTxt){
 		System.out.println("parsing blocks");
-	    Scanner scanner = null;
 	    ArrayList<String> blocks = new ArrayList<String>(); 
-		try {
-			scanner = new Scanner(blocksTxt);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	    
+	    InputStream is = getClass().getResourceAsStream(blocksTxt);
+	    InputStreamReader isr = new InputStreamReader(is);
+	    BufferedReader br = new BufferedReader(isr);
+	    String line;
 		
 		blocks.add("0"); //fill in index 0
-	    while(scanner.hasNext()){
-	        String line = (scanner.nextLine());
-	        blocks.add(line.trim());
-	    }
+	    try {
+			while ((line = br.readLine()) != null) {
+				blocks.add(line.trim());
+			}
+			br.close();
+		    isr.close();
+		    is.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	    
-	    scanner.close();
 		return blocks;
 	}
 	
-	private static ConcurrentHashMap<String, ArrayList<String>> getOutNeighbors(){
+	private ConcurrentHashMap<String, ArrayList<String>> getOutNeighbors(){
 		ConcurrentHashMap<String, ArrayList<String>> outNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
-		Scanner scanner = null;
-		try {
-			scanner = new Scanner(edgesTxt);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		 while(scanner.hasNext()){
-		        String line = (scanner.nextLine());
-		        String result[] = line.split("\\s+");
-		        String src= "";
-		        String dest ="";
-		        double prob =0.0;
-		        
-		        if (result[0].equals("")){
-		        	src = result[1].intern();
-		        	dest = result[2].intern();
-		        	prob = Double.parseDouble(result[3]);
-		        }
-		        else{
-		        	src = result[0].intern();
-		        	dest = result[1].intern();
-		        	prob = Double.parseDouble(result[2]);
-		        }
-       
-		        if (!(prob>= rejectMin && prob< rejectLimit)){
-		        	if (outNeighbors.containsKey(src)){
-		        		outNeighbors.get(src).add(dest);
-		        	}
-		        	else{
-		        		ArrayList<String> outNeighborList = new ArrayList<String>();
-		        		outNeighborList.add(dest);
-		        		outNeighbors.put(src, outNeighborList);
-		        	}
-		        }
-		 }
+		 InputStream is = getClass().getResourceAsStream(edgesTxt);
+	    InputStreamReader isr = new InputStreamReader(is);
+	    BufferedReader br = new BufferedReader(isr);
+	    String line;
+	    
+	    try{
+		    while ((line = br.readLine()) != null) {
+			        String result[] = line.split("\\s+");
+			        String src= "";
+			        String dest ="";
+			        double prob =0.0;
+			        
+			        if (result[0].equals("")){
+			        	src = result[1].intern();
+			        	dest = result[2].intern();
+			        	prob = Double.parseDouble(result[3]);
+			        }
+			        else{
+			        	src = result[0].intern();
+			        	dest = result[1].intern();
+			        	prob = Double.parseDouble(result[2]);
+			        }
+	       
+			        if (!(prob>= rejectMin && prob< rejectLimit)){
+			        	if (outNeighbors.containsKey(src)){
+			        		outNeighbors.get(src).add(dest);
+			        	}
+			        	else{
+			        		ArrayList<String> outNeighborList = new ArrayList<String>();
+			        		outNeighborList.add(dest);
+			        		outNeighbors.put(src, outNeighborList);
+			        	}
+			        }
+			 }
+		    br.close();
+		    isr.close();
+		    is.close();
+	    } catch(IOException e){
+	    	e.printStackTrace();
+	    }
 		return outNeighbors;
 	}
 	
 
-	private static ConcurrentHashMap<String, ArrayList<String>> getInNeighbors(){
+	private ConcurrentHashMap<String, ArrayList<String>> getInNeighbors(){
 		ConcurrentHashMap<String, ArrayList<String>> inNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
-		Scanner scanner = null;
-		try {
-			scanner = new Scanner(edgesTxt);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		 while(scanner.hasNext()){
-		        String line = (scanner.nextLine());
-		        String result[] = line.split("\\s+");
-		        String src= "";
-		        String dest ="";
-		        double prob =0.0;
-		        
-		        if (result[0].equals("")){
-		        	src = result[1].intern();
-		        	dest = result[2].intern();
-		        	prob = Double.parseDouble(result[3]);
-		        }
-		        else{
-		        	src = result[0].intern();
-		        	dest = result[1].intern();
-		        	prob = Double.parseDouble(result[2]);
-		        }
-       
-		        if (!(prob>= rejectMin && prob< rejectLimit)){
-		        	if (inNeighbors.containsKey(dest)){
-		        		inNeighbors.get(dest).add(src);
-		        	}
-		        	else{
-		        		ArrayList<String> inNeighborList = new ArrayList<String>();
-		        		inNeighborList.add(src);
-		        		inNeighbors.put(dest, inNeighborList);
-		        	}
-		        }
-		 }
+		 InputStream is = getClass().getResourceAsStream(edgesTxt);
+		    InputStreamReader isr = new InputStreamReader(is);
+		    BufferedReader br = new BufferedReader(isr);
+		    String line;
+		    
+		    try{
+			    while ((line = br.readLine()) != null) {
+			        String result[] = line.split("\\s+");
+			        String src= "";
+			        String dest ="";
+			        double prob =0.0;
+			        
+			        if (result[0].equals("")){
+			        	src = result[1].intern();
+			        	dest = result[2].intern();
+			        	prob = Double.parseDouble(result[3]);
+			        }
+			        else{
+			        	src = result[0].intern();
+			        	dest = result[1].intern();
+			        	prob = Double.parseDouble(result[2]);
+			        }
+	       
+			        if (!(prob>= rejectMin && prob< rejectLimit)){
+			        	if (inNeighbors.containsKey(dest)){
+			        		inNeighbors.get(dest).add(src);
+			        	}
+			        	else{
+			        		ArrayList<String> inNeighborList = new ArrayList<String>();
+			        		inNeighborList.add(src);
+			        		inNeighbors.put(dest, inNeighborList);
+			        	}
+			        }
+			    }
+			    br.close();
+			    isr.close();
+			    is.close();
+		    } catch(IOException e){
+		    	e.printStackTrace();
+		    }
 		return inNeighbors;
 	}
 	
@@ -168,18 +177,16 @@ public class Helper {
 	 * @return edges (u,v) where u is in block blockNum. Returns an ArrayList of edges, which are defined by
 	 * a ConcurrentHashmaps with keys "source" and "destination"
 	 */
-	public static ArrayList<ConcurrentHashMap<String,String>> getEdgesInBlock(String blockNum){
+	public ArrayList<ConcurrentHashMap<String,String>> getEdgesInBlock(String blockNum){
 		ArrayList<ConcurrentHashMap<String,String>>  BE = 
 				new ArrayList<ConcurrentHashMap<String,String>>();
-		Scanner scanner = null;
-		try {
-			scanner = new Scanner(edgesTxt);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		 while(scanner.hasNext()){
-		        String line = (scanner.nextLine());
+		InputStream is = getClass().getResourceAsStream(edgesTxt);
+	    InputStreamReader isr = new InputStreamReader(is);
+	    BufferedReader br = new BufferedReader(isr);
+	    String line;
+	    
+	    try{
+		    while ((line = br.readLine()) != null) {
 		        String result[] = line.split("\\s+");
 		        String src= "";
 		        String dest ="";
@@ -193,28 +200,33 @@ public class Helper {
 		        	dest = result[1].intern();
 		        }
 		
-			int srcNode = Integer.parseInt(src);
-			int blockNumInt = Integer.parseInt(blockNum);
-			int blockLowerBound = Integer.parseInt(blocks.get(Integer.parseInt(blockNum)));
-			int blockUpperBound = Integer.MAX_VALUE;
-			if (!(blockNumInt == blocks.size() - 1)){
-				blockUpperBound = Integer.parseInt(blocks.get(Integer.parseInt(blockNum)+1));
-			}
-			
-			if (srcNode >= blockLowerBound && srcNode < blockUpperBound){
-				ConcurrentHashMap<String,String> edgeLine = new ConcurrentHashMap<String,String>();
-				edgeLine.put("source", src);
-				edgeLine.put("destination", dest);
+				int srcNode = Integer.parseInt(src);
+				int blockNumInt = Integer.parseInt(blockNum);
+				int blockLowerBound = Integer.parseInt(blocks.get(Integer.parseInt(blockNum)));
+				int blockUpperBound = Integer.MAX_VALUE;
+				if (!(blockNumInt == blocks.size() - 1)){
+					blockUpperBound = Integer.parseInt(blocks.get(Integer.parseInt(blockNum)+1));
+				}
 				
-				BE.add(edgeLine );
+				if (srcNode >= blockLowerBound && srcNode < blockUpperBound){
+					ConcurrentHashMap<String,String> edgeLine = new ConcurrentHashMap<String,String>();
+					edgeLine.put("source", src);
+					edgeLine.put("destination", dest);
+					
+					BE.add(edgeLine );
+				}
+				
 			}
-			
-		}
+	    } catch(IOException e){
+	    	e.printStackTrace();
+	    }
+	
+	
 		return BE;
 		
 	}
 	
-	public static String getBlockId(String nodeId){
+	public String getBlockId(String nodeId){
 		int nodeIdInt = Integer.parseInt(nodeId);
 		for(int indexOfFirst = 0; indexOfFirst < blocks.size(); indexOfFirst++){
 			if(nodeIdInt < Integer.parseInt(blocks.get(indexOfFirst))){
@@ -249,7 +261,7 @@ public class Helper {
 	 * @param node
 	 * @return in-degree of node
 	 */
-	public static int getInDegree(String node){
+	public int getInDegree(String node){
 		return getInNeighbors().get(node).size();
 	}
 	
@@ -258,7 +270,7 @@ public class Helper {
 	 * @param node
 	 * @return out-degree of node
 	 */
-	public static int getOutDegree(String node){
+	public int getOutDegree(String node){
 		return getOutNeighbors().get(node).size();
 	}
 	
@@ -267,11 +279,11 @@ public class Helper {
 	 * @param node
 	 * @return total of in and out degree of node
 	 */
-	public static int getTotalDegree(String node){
+	public int getTotalDegree(String node){
 		return getInDegree(node) + getOutDegree(node);
 	}
 	
-	private static int writePRInputFile(){
+	private int writePRInputFile(){
 		Double initial_PR = 1.0;
 		PrintWriter out = null;
 		int numNodes = 0;
@@ -306,38 +318,18 @@ public class Helper {
 		return numNodes;
 	}
 	
-	private static int writeBlockedPRInputFile(){
-		Double initial_PR = 1.0;
-		PrintWriter out = null;
-		int numNodes = 0;
-		try {
-			out = new PrintWriter(new FileOutputStream("input_files/output.txt"));
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		System.out.println("getting inNeighbors");
-		ConcurrentHashMap<String,ArrayList<String>> inNeighborsHT = getInNeighbors();
-		System.out.println("inNeighbors done");
-		for(String node: nodes.keySet()){
-			numNodes++;
-			out.write(node+"\t"+initial_PR+",");
-			ArrayList<String> inNeighbors = inNeighborsHT.get(node);
-			if (!(inNeighbors == null)){
-//				System.out.println(node + "'s neighbors: " + outNeighbors);
-				for(int i = 0; i < inNeighbors.size(); i++){
-					out.write(inNeighbors.get(i));
-					if (i!=inNeighbors.size()-1){
-						out.write(",");
-					}
-				}
-			}
-			out.write("\n");
-			System.out.println("node " + node + " done writing");
-		}
-		out.close();
-		System.out.println("done writing file");
-		return numNodes;
+	  public void test3Columns() throws IOException{
+	    InputStream is = getClass().getResourceAsStream("blocks.txt");
+	    InputStreamReader isr = new InputStreamReader(is);
+	    BufferedReader br = new BufferedReader(isr);
+	    String line;
+	    while ((line = br.readLine()) != null) 
+	    {
+	    	System.out.println(line);
+	    }
+	    br.close();
+	    isr.close();
+	    is.close();
 	}
 	
 	
