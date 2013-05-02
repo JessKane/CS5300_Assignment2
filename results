@@ -1,0 +1,87 @@
+
+====Regular Blocked====
+Pass number 1
+Total residual 1602174.27709968
+Average residual 2.3381554764089136
+Average block iterations: 3.318840579710145
+
+Pass number 2
+Total residual 218983.6272644
+Average residual 0.3195768242260263
+Average block iterations: 2.927536231884058
+
+Pass number 3
+Total residual 126739.99802221
+Average residual 0.18495979163523196
+Average block iterations: 2.8840579710144927
+
+Pass number 4
+Total residual 62105.89033084
+Average residual 0.09063510110596441
+Average block iterations: 2.8405797101449277
+
+Pass number 5
+Total residual 40194.41385871
+Average residual 0.05865828095487647
+Average block iterations: 2.4057971014492754
+
+Pass number 6
+Total residual 660.5839439
+Average residual 9.640324327598033E-4
+Average block iterations: 1.318840579710145
+
+
+*******
+
+====Gauss-Seidel====
+
+
+====Random Blocking====
+Pass number 1
+Total residual 1602174.27709968
+Average residual 2.3381554764089136
+Average block iterations: 3.318840579710145
+
+Pass number 2
+Total residual 218983.6272644
+Average residual 0.3195768242260263
+Average block iterations: 2.927536231884058
+
+Pass number 3
+Total residual 126739.99802221
+Average residual 0.18495979163523196
+Average block iterations: 2.8840579710144927
+
+Pass number 4
+Total residual 62105.89033084
+Average residual 0.09063510110596441
+Average block iterations: 2.8405797101449277
+
+Pass number 5
+Total residual 40194.41385871
+Average residual 0.05865828095487647
+Average block iterations: 2.4057971014492754
+
+Pass number 6
+Total residual 21781.29409429
+Average residual 0.031786836674240766
+Average block iterations: 2.1159420289855073
+
+Pass number 7
+Total residual 16869.13849319
+Average residual 0.02461821358257811
+Average block iterations: 2.0
+
+Pass number 8
+Total residual 10273.23308906
+Average residual 0.014992386627935146
+Average block iterations: 2.0144927536231885
+
+Pass number 9
+Total residual 8441.23299709
+Average residual 0.012318831628927511
+Average block iterations: 1.9710144927536233
+
+
+
+
