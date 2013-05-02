@@ -19,11 +19,18 @@ import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.TextOutputFormat;
+import org.apache.hadoop.mapreduce.Job;
 
 public class BlockedPageRank {
 
 	static int totalNodes = 685230;
 	static Double convergenceBound = 0.001;
+	static double counterMultiplier = 100000000.0;
+	
+	public static enum MATCH_COUNTER {
+			PR_RESIDUAL_SUM,
+			BLOCK_ITER_SUM
+		};
 
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
@@ -35,7 +42,7 @@ public class BlockedPageRank {
 		// 1: a list of all edges {u, v|u->v}
 		// 2: for each outgoing node, pagerank/deg(u)
 		
-		//Helper helper = new Helper();
+		Helper helper = new Helper();
 	
 		boolean useGaussSeidel;
 		boolean useRandomBlocking;
@@ -58,14 +65,13 @@ public class BlockedPageRank {
 			}
 		}
 		
-		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
+		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
 			String line = value.toString();
 			System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
-			System.out.println("BREAK1 " + useGaussSeidel + " " + numIterations);
 			
-			String blockId = useRandomBlocking?Helper.getBlockID_RandPart(nodeId):Helper.getBlockId(nodeId);
+			String blockId = useRandomBlocking?Helper.getBlockID_RandPart(nodeId):helper.getBlockId(nodeId);
 					
 			// Collect Input
 			Integer nodeU = Integer.parseInt(nodeId);
@@ -82,7 +88,7 @@ public class BlockedPageRank {
 			// Output #2: All edges to new blocks sent to recieving node's block
 			//Contains partial PR's of emitting node
 			for (Integer edge: outgoingEdges) {
-				String recvBlock = useRandomBlocking?Helper.getBlockID_RandPart(edge + ""):Helper.getBlockId(edge + "");
+				String recvBlock = useRandomBlocking?Helper.getBlockID_RandPart(edge + ""):helper.getBlockId(edge + "");
 				if(!recvBlock.equals(blockId)){
 					Text outputKey = new Text (recvBlock);
 
@@ -136,8 +142,6 @@ public class BlockedPageRank {
 		}
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
-			System.out.println("BREAK2 " + useGaussSeidel + " " + numIterations);
-			
 			// Get the input
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			pageRankValues = new HashMap<Integer,Double>();
@@ -212,19 +216,30 @@ public class BlockedPageRank {
 				orderedNodes = new ArrayList<Integer> (blockEdgesE2R.keySet());
 			}
 			
+			//Clone pageranks for residual calculations
+			@SuppressWarnings("unchecked")
+			HashMap<Integer, Double> pageRankCopy = (HashMap<Integer, Double>) pageRankValues.clone();
+			
 			//Iterate through block
 			if(numIterations > 0){
 				for(int i = 0; i < numIterations; i++){
-					IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions);
+					IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions, reporter);
 				}
 			} else{
 				Double avgErr = Double.MAX_VALUE;
 				int iterationsUsed = 0;
 				while(avgErr > convergenceBound){
-					avgErr = IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions);
+					avgErr = IterateBlockOnce(orderedNodes, blockEdgesE2R, blockEdgesR2E, boundaryConditions, reporter);
 					iterationsUsed++;
 				}
 				System.out.println("ITERATIONS USED ON BLOCK" + key + ": " + iterationsUsed);
+				reporter.getCounter(MATCH_COUNTER.BLOCK_ITER_SUM).increment(iterationsUsed);
+			}
+			
+			//Calculate residuals
+			for(Integer node : blockEdgesE2R.keySet()){
+				Integer inc = (int) (Math.abs(pageRankCopy.get(node) - pageRankValues.get(node)) / pageRankValues.get(node) * counterMultiplier);
+				reporter.getCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).increment(inc);
 			}
 			
 			
@@ -294,7 +309,8 @@ public class BlockedPageRank {
 		
 		
 		public Double IterateBlockOnce(ArrayList<Integer> orderedNodes, HashMap<Integer, ArrayList<Integer>> blockEdgesE2R, 
-				HashMap<Integer, ArrayList<Integer>> blockEdgesR2E, HashMap<Integer, ArrayList<Integer>> boundaryConditions){
+				HashMap<Integer, ArrayList<Integer>> blockEdgesR2E, HashMap<Integer, ArrayList<Integer>> boundaryConditions,
+				Reporter reporter){
 			/*for( v ∈ B ) { NPR[v] = 0; }
 		    for( v ∈ B ) {
 		        for( u where <u, v> ∈ BE ) {
@@ -328,7 +344,8 @@ public class BlockedPageRank {
 					}
 				}
 				
-				Double newPageRank = ((1-d)/totalNodes) + newPageRanks.get(v)*d;
+				Double newPageRank = ((1-d)/ totalNodes) + newPageRanks.get(v)*d;
+				
 				errorVals.add(Math.abs(pageRankValues.get(v) - newPageRank) / newPageRank);
 				if(useGaussSeidel){
 					pageRankValues.put(v, newPageRank);
@@ -356,6 +373,7 @@ public class BlockedPageRank {
 	
 
 	public static void main(String[] args) throws Exception {
+		Helper helper = new Helper();
 		
 		JobConf conf = new JobConf(BlockedPageRank.class);
 		conf.setJobName("blocked_page_rank");
@@ -399,7 +417,15 @@ public class BlockedPageRank {
 			}
 		}
 		
+		 Job job = new Job(conf);
+		 job.waitForCompletion(true);
+
 		
-		JobClient.runJob(conf);
+		 System.out.println("Total residual " + job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier);
+		 System.out.println("Average residual " + job.getCounters().findCounter(MATCH_COUNTER.PR_RESIDUAL_SUM).getValue() / counterMultiplier 
+				 / totalNodes);
+		 System.out.println("Average block iterations: " + job.getCounters().findCounter(MATCH_COUNTER.BLOCK_ITER_SUM).getValue() / helper.blocks.size());
+		 
+
 	}
 }
