@@ -22,7 +22,7 @@ import org.apache.hadoop.mapred.TextOutputFormat;
 
 public class SimplePageRank {
 
-	static int totalNodes = 685230;
+	static int totalNodes = 6;
 	
 	public static class Map extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
 		// file with list of (current node u, pr(u), {v|u->v})
@@ -35,7 +35,7 @@ public class SimplePageRank {
 		
 		public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {			
 			String line = value.toString();
-			
+
 			System.out.println("mapper input: " + line);
 			String nodeId = line.split("\t")[0];
 			String[] mapInput = line.split("\t")[1].split(",");
@@ -92,8 +92,8 @@ public class SimplePageRank {
 		// emit: current node v, pr(v), {w|v->w}
 
 		public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
-			// Get the input
-//			System.out.println("vvvvvv");
+			// Get the input			
+			System.out.println("vvvvvv Reducer " + key.toString());
 			ArrayList<Integer> outlinks = new ArrayList<Integer>();
 			HashMap<Integer,Double> pageRankValues = new HashMap<Integer,Double>();
 			double pageRankSum = 0.0;
@@ -115,17 +115,18 @@ public class SimplePageRank {
 					pageRankValues.put(Integer.parseInt(splitLine[1]), Double.parseDouble(splitLine[2]));
 					pageRankSum += Double.parseDouble(splitLine[2]);
 
-//					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
+					System.out.println("node: " + splitLine[1] + ", PR= " + splitLine[2] + ", PRSum= " + pageRankSum);
 				}
 			}
 			
 			// Compute New PageRank Value
+
 			Double newPageRank = 0.0;
 			if (totalNodes== 0){
 				newPageRank = 0.0;
 			}
 			else{
-				newPageRank = ((1-d)/totalNodes) + pageRankSum*d;
+				newPageRank = (1-d) + pageRankSum*d;
 			}
 			
 			// Emit the current data

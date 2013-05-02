@@ -12,15 +12,15 @@ public class Helper {
 	static Properties pathProperties = new Properties();
 	
 	//Don't change these now, they're they're linked to the textfiles in the same location as the class file.
-	static String nodesTxt = "nodes.txt";
-	static String edgesTxt = "edges.txt";
+	static String nodesTxt = "input_files/nodes.txt";
+	static String edgesTxt = "input_files/edges.txt";
 	static String blocksTxt = "blocks.txt";
 
 	static double fromNetID = 0.46;
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
-	//static ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
-	ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	//ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
+	ConcurrentHashMap<String,String> nodes= null;
 	ArrayList<String> blocks = parseBlocks(blocksTxt);
 	static int totalNodes = 685230;
 	
