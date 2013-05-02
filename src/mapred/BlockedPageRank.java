@@ -424,12 +424,12 @@ public class BlockedPageRank {
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
 
-		if(pass == 0){
-			FileInputFormat.setInputPaths(conf, new Path(args[0]));
-		}else{
-			FileInputFormat.setInputPaths(conf, new Path(args[1] + (pass - 1)));
-		}
-		FileOutputFormat.setOutputPath(conf, new Path(args[1] + pass));
+			if(pass == 0){
+				FileInputFormat.setInputPaths(conf, new Path(args[0]));
+			}else{
+				FileInputFormat.setInputPaths(conf, new Path(args[1] + (pass - 1)));
+			}
+			FileOutputFormat.setOutputPath(conf, new Path(args[1] + pass));
 		
 		conf.set("useGaussSeidel", useGS + "");
 		conf.set("useRandomBlocking", useRB + "");

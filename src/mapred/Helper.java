@@ -1,10 +1,7 @@
-/*
- * must change file paths of nodesTxt, edgesTxt, and blocksTxt if you want to use these methods
- */
+//Helper.java contains several helper functions that may or may not be used in SimplePageRank and BlockedPageRank
 
 package mapred;
 import java.io.*;
-import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,15 +13,22 @@ public class Helper {
 	static String edgesTxt = "input_files/edges.txt";
 	static String blocksTxt = "blocks.txt";
 
-	static double fromNetID = 0.46;
+	
+	//values used to create a subset of edges
+	static double fromNetID = 0.46; //based on netID awc64
 	static double rejectMin = 0.99 * fromNetID;
 	static double rejectLimit = rejectMin + 0.01;
+	
 	//ConcurrentHashMap<String,String> nodes= parseNodes(nodesTxt);
 	ConcurrentHashMap<String,String> nodes= null;
 	ArrayList<String> blocks = parseBlocks(blocksTxt);
 	static int totalNodes = 685230;
 	
-	
+	/**
+	 * parses nodes.txt into a ConcurrentHashMap of <node, block> 
+	 * @param nodesTxt - nodes.txt from cms
+	 * @return
+	 */
 	private ConcurrentHashMap<String, String> parseNodes(String nodesTxt){
 		System.out.println("parsing nodes");
 		InputStream is = getClass().getResourceAsStream(nodesTxt);
@@ -33,12 +37,10 @@ public class Helper {
 	    String line;
 	    
 	    ConcurrentHashMap<String,String> nodes= new ConcurrentHashMap<String, String>();
-		//scanner = new Scanner(nodesTxt);
 	    
 	    try {
 			while ((line = br.readLine()) != null) {
 				String result[] = line.split("\\s+");
-//		        System.out.println(result[0]+ ", " +result[1]);
 		        if (result[0].equals("")){
 		        	nodes.put(result[1], result[2]);
 		        }
@@ -56,7 +58,11 @@ public class Helper {
 		return nodes;
 	}
 	
-	
+	/**
+	 * parse blocks.txt to an ArrayList
+	 * @param blocksTxt - blocks.txt (from cms)
+	 * @return ArrayList of values found in blocks.txt
+	 */
 	private ArrayList<String> parseBlocks(String blocksTxt){
 		System.out.println("parsing blocks");
 	    ArrayList<String> blocks = new ArrayList<String>(); 
@@ -81,6 +87,10 @@ public class Helper {
 		return blocks;
 	}
 	
+	/**
+	 * Reads through edges.txt, building up a list of outgoing neighbors for each node
+	 * @return A ConcurrentHashMap of nodes and its out-neighbors (nodes that the key node points to)
+	 */
 	private ConcurrentHashMap<String, ArrayList<String>> getOutNeighbors(){
 		ConcurrentHashMap<String, ArrayList<String>> outNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
 		 InputStream is = getClass().getResourceAsStream(edgesTxt);
@@ -106,6 +116,7 @@ public class Helper {
 			        	prob = Double.parseDouble(result[2]);
 			        }
 	       
+			        //add edge if it does not fall in rejection range
 			        if (!(prob>= rejectMin && prob< rejectLimit)){
 			        	if (outNeighbors.containsKey(src)){
 			        		outNeighbors.get(src).add(dest);
@@ -127,6 +138,10 @@ public class Helper {
 	}
 	
 
+	/**
+	 * Reads through edges.txt, building up a list of incoming neighbors for each node
+	 * @return A ConcurrentHashMap of nodes and its in-neighbors (nodes that point to the key node)
+	 */
 	private ConcurrentHashMap<String, ArrayList<String>> getInNeighbors(){
 		ConcurrentHashMap<String, ArrayList<String>> inNeighbors = new ConcurrentHashMap<String, ArrayList<String>>();
 		 InputStream is = getClass().getResourceAsStream(edgesTxt);
@@ -152,6 +167,7 @@ public class Helper {
 			        	prob = Double.parseDouble(result[2]);
 			        }
 	       
+			      //add edge if it does not fall in rejection range
 			        if (!(prob>= rejectMin && prob< rejectLimit)){
 			        	if (inNeighbors.containsKey(dest)){
 			        		inNeighbors.get(dest).add(src);
@@ -227,6 +243,11 @@ public class Helper {
 		
 	}
 	
+	/**
+	 * 
+	 * @param nodeId
+	 * @return blockID of node identified by nodeID
+	 */
 	public String getBlockId(String nodeId){
 		int nodeIdInt = Integer.parseInt(nodeId);
 		for(int indexOfFirst = 0; indexOfFirst < blocks.size(); indexOfFirst++){
@@ -237,14 +258,21 @@ public class Helper {
 		return -1 + "";
 	}
 	
-	/*for EC
-	 * 
-	 * partitions edges into random blocks according to hash function
+	/**
+	 * Randomly Partitioned Block Extra Credit
+	 * Randomly assigns a node to a block according to the hash function
+	 * @param node - node to be assigned to a block
+	 * @return the blockID to which the node was assigned 
 	 */
 	public static String getBlockID_RandPart(String node){
 		return "" + (hash(node)%68);
 	}
 	
+	/**
+	 * Converts String node into a char array and sums up the char values for each character 
+	 * @param node - node to be hashed
+	 * @return
+	 */
 	private static int hash(String node){
 		char ch[] = node.toCharArray();
 		int strLength = node.length();
@@ -284,6 +312,12 @@ public class Helper {
 		return getInDegree(node) + getOutDegree(node);
 	}
 	
+	/**
+	 * Creates the input file used in SimplePageRank and BlockedPageRank
+	 * Writes files to output.txt
+	 * Format: node	initial PR value, {outgoing neighbors}
+	 * @return number of nodes
+	 */
 	private int writePRInputFile(){
 		Double initial_PR = 1.0/totalNodes;
 		PrintWriter out = null;
@@ -294,15 +328,16 @@ public class Helper {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("getting outneighbors");
+		
+		//get outgoing neighbors
 		ConcurrentHashMap<String,ArrayList<String>> outNeighborsHT = getOutNeighbors();
-		System.out.println("outneighbors done");
+		
+		//write input text file 
 		for(String node: nodes.keySet()){
 			numNodes++;
 			out.write(node+"\t"+initial_PR+",");
 			ArrayList<String> outNeighbors = outNeighborsHT.get(node);
 			if (!(outNeighbors == null)){
-//				System.out.println(node + "'s neighbors: " + outNeighbors);
 				for(int i = 0; i < outNeighbors.size(); i++){
 					out.write(outNeighbors.get(i));
 					if (i!=outNeighbors.size()-1){
@@ -312,10 +347,8 @@ public class Helper {
 			}
 			
 			out.write("\n");
-			System.out.println("node " + node + " done writing");
 		}
 		out.close();
-		System.out.println("done writing file");
 		return numNodes;
 	}
 	
@@ -333,7 +366,7 @@ public class Helper {
 	    is.close();
 	}
 	
-	
+	//used to create page rank input file
 	public static void main(String[] args) throws Exception {
 		//Helper h = new Helper();
 		//h.writePRInputFile();
